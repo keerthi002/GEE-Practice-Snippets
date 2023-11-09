@@ -1,0 +1,42 @@
+//  !!!!First Please import your own geometry file here!!!!
+// Get the image in a certain date range and extract the median values
+var image = ee.Image(
+ landsat.filterBounds(geometry)
+ .filterDate('2020-06-01', '2020-08-31')
+ .median()
+);
+// Clip the image to the specified boundary
+var composite = image.clip(geometry);
+var composite = composite.toFloat();
+// Compute the NDVI
+var nir = composite.select('B5');
+var red = composite.select('B4');
+var ndvi = nir.subtract(red).divide(nir.add(red));
+var ndvi = ndvi.clip(geometry);
+// Add map layers
+Map.addLayer(ndvi, {min: 0, max: 1, palette: ['black', 'yellow', 'green']}, 'continuous NDVI', false);
+// Center the map on the composite image
+Map.centerObject(composite, 6);
+// Compute the mean and standard deviation of NDVI
+var mean_ndvi = ndvi.reduceRegion({
+ reducer: ee.Reducer.mean(),
+ geometry: geometry,
+ scale: 10
+});
+var sd_ndvi = ndvi.reduceRegion({
+ reducer: ee.Reducer.stdDev(),
+ geometry: geometry,
+ scale: 10
+});
+print('Mean NDVI:', mean_ndvi);
+print('Standard Deviation NDVI:', sd_ndvi);
+// Classify NDVI into 5 classes
+var ndvi2 = ee.Image(1)
+ .where(ndvi.gt(0.0).and(ndvi.lte(0.2)), 2)
+ .where(ndvi.gt(0.2).and(ndvi.lte(0.4)), 3)
+ .where(ndvi.gt(0.4).and(ndvi.lte(0.6)), 4)
+ .where(ndvi.gt(0.6), 5);
+var ndvi2 = ndvi2.clip(geometry);
+// Add classified NDVI layer
+Map.addLayer(ndvi2, {min: 1, max: 5, palette: ['#654321','#FFA500','#FFFF00', 
+'#00FF00', '#008000']}, 'Classified NDVI', true);
